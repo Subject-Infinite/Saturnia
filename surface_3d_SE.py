@@ -129,7 +129,7 @@ for a in range(0,len(mid_val)-1):
 wshed_seed = np.array(i)
 wshed_seed_th = np.array(wshed_seed)
 wshed_seed_th = np.multiply(wshed_seed_th,1).astype(np.uint8)
-#wshed_seed=cv.dilate(wshed_seed,seed_kernel,iterations=10)
+
 #wshed_seed_2=cv.distanceTransform(wshed_seed,cv.DIST_L2,5)
 #wshed_seed_th=cv.threshold(wshed_seed_th,12,255,cv.THRESH_BINARY)
 #wshed_seed_th=wshed_seed_th[1]
@@ -198,16 +198,49 @@ eightB_img2=(img2/255).astype("uint8")
 #print(markers)
 eightB_img2=cv.cvtColor(eightB_img2,cv.COLOR_GRAY2RGB) #my images are single channel but opencv watershed requires 3 channel input
 wshed_show = cv.watershed(eightB_img2,markers)
+wshed_show_og = wshed_show
+print(wshed_show)
+print(len(np.unique(wshed_show)))
+uniq_wshed = np.unique(wshed_show)
+#determine the amount of pixels per watershed region, determines area. we want to remove watersheds above certain value. Turn pixel values above certain value to -1
+for a in uniq_wshed:
+	occur=np.count_nonzero(wshed_show==a)
+	print("{} frequency = {}".format(a,occur))
+	if occur > 5000:
+		wshed_show = np.where(wshed_show==a,-1,wshed_show)
+print(uniq_wshed)
 #wshed_show_size = measure.regionprops(wshed_show)
 #print(wshed_show)
 #print(wshed_show_size[1])
 wshed_bound=cv.inRange(wshed_show,-1,-1)
+#wshed_show_gray = cv.cvtColor(wshed_show,cv.COLOR_RGB2GRAY)
+#print(wshed_show.dtype)
+#print(wshed_show)
+wshed_show = wshed_show.astype(np.uint8)
+wshed_show = cv.threshold(wshed_show,254,255,cv.THRESH_BINARY)
+#wshed_show=cv.dilate(wshed_show[1],seed_kernel,iterations=1)
+'''
+print("wshed_show",wshed_show)
+for a in range(0,len(wshed_show[1])):
+	print(wshed_show[1][a])
+'''
+contours_func=cv.findContours(wshed_show[1],cv.RETR_LIST,cv.CHAIN_APPROX_NONE)
+contours=contours_func[0]
+#print(contours)
+#print(len(contours[0]))
+#print(contours[10])
+contour_draw=cv.drawContours(eightB_img2,contours,-1,(255,255,255),3)
+#cv.imshow("contours",contours[1].astype("uint8"))
+#cv.waitKey(0)
+
+
+'''
 wshed_comp=cv.connectedComponentsWithStats(wshed_bound,connectivity=4)
 stats = wshed_comp[3]
-#print(len(stats))
+print((stats))
 #print(len(wshed_comp))
 #wshed_size_th = wshed_show_size['area'<500]
-
+'''
 ####################
 ####Plot outputs####
 ####################
@@ -232,9 +265,10 @@ ax2.imshow(img2)
 ax3 = fig.add_subplot(spec_G[1,0])
 ax3.imshow(wshed_seed)
 ax4 = fig.add_subplot(spec_G[1,1])
-#ax4.imshow(wshed_show)
-ax4.imshow(wshed_bound)
-
+#ax4.imshow(wshed_show[1])
+#ax4.imshow(wshed_bound)
+#ax4.imshow(wshed_show_og)
+ax4.imshow(contour_draw)
 
 plt.show()
 plt.clf
