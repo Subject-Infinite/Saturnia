@@ -7,7 +7,10 @@ import itertools # import permutations, product
 from matplotlib.animation import FuncAnimation
 from scipy.signal import find_peaks, peak_prominences
 from PIL import Image, ImageDraw
-
+#from skimage import measure
+#import hdbscan
+import pandas as pd
+from sklearn.cluster import DBSCAN
 '''
 def animate(frames,X,img2):
 	#ax1.clear()
@@ -80,19 +83,58 @@ def find_if_close(c1,c2):
 
 #nucleus_x=list(np.array(nucleus_x).flat)
 #nucleus_y=list(np.array(nucleus_y).flat)
-print(nucleus_x)
+#print(nucleus_x)
 #print(nucleus_y)
+
+peak_crd = pd.DataFrame(list(zip(nucleus_x,nucleus_y)),columns=['x','y'])
+#print(peak_crd)
+#clusterer = hdbscan.HDBSCAN(min_cluster_size=7,min_samples=1).fit(peak_crd)
+clusterer = DBSCAN(eps=20,min_samples=10).fit(peak_crd)
+#print(clusterer)
+#print(clusterer.labels_)
+peak_crd['labels'] = clusterer.labels_
+#print(peak_crd)
+
+def ellbound(dataframe,label,r_index):
+	boundr=int(dataframe[str(label)][r_index])
+	return boundr
+
+mid_val = peak_crd.groupby(['labels']).median() #find median (in y) per cluster (nucleus) to draw for watershed seed
+#print(mid_val)
+#print(len(mid_val))
+
 seed_kernel=np.ones((3,3),np.uint8)
 i = Image.new("1",(1920,1920),"black")
 wshed_seed = ImageDraw.Draw(i)
-for a in range(0,len(nucleus_y)):
-	print(nucleus_x[a],nucleus_y[a])
-	markerdilate=1
-	wshed_seed.ellipse((nucleus_x[a]-markerdilate,nucleus_y[a]-markerdilate,nucleus_x[a]+markerdilate,nucleus_y[a]+markerdilate),"white")
+#print(int(mid_val['y'][13]))
+for a in range(0,len(mid_val)-1):
+	#print(nucleus_x[a],nucleus_y[a])
+	markerdilate=3
+	#print(int(mid_val['x'][a]),int(mid_val['y'][a]))
+	y_b=ellbound(mid_val,'y',a)
+	x_b=ellbound(mid_val,'x',a)
+	#print(x_b,y_b)
+	#wshed_seed.ellipse((int(mid_val['x'][a])-markerdilate,int(mid_val['y'][a])-markerdilate,int(mid_val['x'][a])+markerdilate,int(mid_val['y'][a])+markerdilate),"white")
+	wshed_seed.ellipse((x_b-markerdilate,y_b-markerdilate,x_b+markerdilate,y_b+markerdilate),'white')
+	#wshed_seed.point((ellbound(mid_val,'x',a),ellbound(mid_val,'y',a)),'white')
+#group by cluster label
+#find median y per goup and rest of coordinate with it
+#put these coords in new list and use these coordinates to plot watershed seeds
+
+#markerdilate = 1
+#wshed_seed.ellipse((mid_val['x']-markerdilate,mid_val['y']-markerdilate,mid_val['x']+markerdilate,mid_val['y']+markerdilate),'white')
+
+
+
 wshed_seed = np.array(i)
-wshed_seed=np.multiply(wshed_seed,1).astype(np.uint8)
-wshed_seed=cv.dilate(wshed_seed,seed_kernel,iterations=5)
-wshed_seed=cv.erode(wshed_seed,seed_kernel,iterations=3)
+wshed_seed_th = np.array(wshed_seed)
+wshed_seed_th = np.multiply(wshed_seed_th,1).astype(np.uint8)
+#wshed_seed=cv.dilate(wshed_seed,seed_kernel,iterations=10)
+#wshed_seed_2=cv.distanceTransform(wshed_seed,cv.DIST_L2,5)
+#wshed_seed_th=cv.threshold(wshed_seed_th,12,255,cv.THRESH_BINARY)
+#wshed_seed_th=wshed_seed_th[1]
+#wshed_seed_th=np.multiply(wshed_seed_th,1).astype(np.uint8)
+#wshed_seed=cv.erode(wshed_seed,seed_kernel,iterations=3)
 #print(wshed_seed)
 
 '''
@@ -143,9 +185,9 @@ back_img2=cv.dilate(back_img2[1],kernel,iterations=2)
 #print("back_img2 dtype = {}, wshed_seed dtype = {}".format(back_img2.dtype,wshed_seed.dtype))
 
 
-unknown=cv.subtract(back_img2,wshed_seed)
+unknown=cv.subtract(back_img2,wshed_seed_th)
 
-_, markers = cv.connectedComponents(wshed_seed)
+_, markers = cv.connectedComponents(wshed_seed_th)
 markers = markers+10
 
 markers[unknown==255]=0
@@ -156,6 +198,15 @@ eightB_img2=(img2/255).astype("uint8")
 #print(markers)
 eightB_img2=cv.cvtColor(eightB_img2,cv.COLOR_GRAY2RGB) #my images are single channel but opencv watershed requires 3 channel input
 wshed_show = cv.watershed(eightB_img2,markers)
+#wshed_show_size = measure.regionprops(wshed_show)
+#print(wshed_show)
+#print(wshed_show_size[1])
+wshed_bound=cv.inRange(wshed_show,-1,-1)
+wshed_comp=cv.connectedComponentsWithStats(wshed_bound,connectivity=4)
+stats = wshed_comp[3]
+#print(len(stats))
+#print(len(wshed_comp))
+#wshed_size_th = wshed_show_size['area'<500]
 
 ####################
 ####Plot outputs####
@@ -168,18 +219,21 @@ ax1.plot(list(range(0,1920)),xVal)
 ax1.plot(peaks_x,peaks_y,"x")
 ax1.vlines(x=peaks_x,ymin=contour_heights,ymax=xVal[peaks_x])
 ax1.hlines(y=peaks[1].get("width_heights"),xmin=peaks[1].get("left_ips"),xmax=peaks[1].get("right_ips"))
+
 x = list(range(0,1920))
 y = [row]*len(x)
 y_plot = [row]*len(peaks[0])
 ax2.plot(x,y)
 ax2.plot(peaks[0],y_plot,"x")
+ax2.scatter(peak_crd['x'],peak_crd['y'],marker='x',c=peak_crd['labels'])
 ax2.imshow(img2)
+
 #ani = FuncAnimation(fig,animate,frames=1920,fargs=(x,img2),interval=150)
 ax3 = fig.add_subplot(spec_G[1,0])
 ax3.imshow(wshed_seed)
 ax4 = fig.add_subplot(spec_G[1,1])
-ax4.imshow(wshed_show)
-
+#ax4.imshow(wshed_show)
+ax4.imshow(wshed_bound)
 
 
 plt.show()
