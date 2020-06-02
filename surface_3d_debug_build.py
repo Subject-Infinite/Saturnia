@@ -24,19 +24,36 @@ def animate(frames,X,img2):
 	#ax1.clear()
 	#fig.clear()
 '''
-
+'''
 im = "nm_t011_z140_c002.tif"
-#im = "green_.tif"
-row = 948
+row = 619
+'''
+#im = "nm_t047_z166_c002.tif"
+
+
+im="nm_t016_z001_c002.tif"
+row = 1536
+
+
 #col = 631
 img2 = np.array(cv.imread(im,-1)) #cv.IMREAD_UNCHANGED))
 #img2 = (img2/256).astype(np.uint8)
 #print(img2.dtype)
+imgOg=img2
 img2 = cv.GaussianBlur(img2, (31,31),0)
+
+
+imgG = img2
+
+
+clahe = cv.createCLAHE(clipLimit=20,tileGridSize=(8,8))
+img2 = clahe.apply(img2)
+
+
 #print(img2.dtype)
 xVal = img2[row]
 
-peaks = find_peaks(xVal,height=500,width=(20,100),distance=75,prominence=150)
+peaks = find_peaks(xVal,height=300,width=(10,500),distance=50,prominence=250)
 print("peaks = {}".format(peaks))
 peaks_x = peaks[0]
 peaks_y = peaks[1].get('peak_heights')
@@ -52,9 +69,11 @@ print("peaks[1] = {}".format(peaks_y))
 '''
 
 fig = plt.figure()
-ax1 = fig.add_subplot(1,3,1)
-ax2 = fig.add_subplot(1,3,2)
+ax1 = fig.add_subplot(1,2,1)
+ax2 = fig.add_subplot(1,2,2)
 #ax2 = ax1b.add_subplot(1,4,1)
+#ax1.imshow(imgOg)
+#ax2.imshow(imgG)
 
 ax1.plot(list(range(0,1920)),xVal)
 ax1.plot(peaks_x,peaks_y,"x")
@@ -66,6 +85,7 @@ y_plot = [row]*len(peaks[0])
 ax2.plot(x,y)
 ax2.plot(peaks[0],y_plot,"x")
 ax2.imshow(img2)
+
 #####
 y_line=[row]*len(peaks_x)
 i = Image.new("1",(1920,1920),"black")
@@ -113,8 +133,8 @@ wshed_show = cv.watershed(img2,markers)
 
 
 
-ax3 = fig.add_subplot(1,3,3)
-ax3.imshow(wshed_show)
+#ax3 = fig.add_subplot(1,3,3)
+#ax3.imshow(wshed_show)
 
 #wshed = cv.watershed(img2,wshed_seed)
 

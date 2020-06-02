@@ -5,12 +5,13 @@ from matplotlib import gridspec
 from PIL import Image
 import itertools # import permutations, product
 from matplotlib.animation import FuncAnimation
-from scipy.signal import find_peaks, peak_prominences
+from scipy.signal import find_peaks, peak_prominences, find_peaks_cwt
 from PIL import Image, ImageDraw
-#from skimage import measure
+from skimage.morphology import extrema
 #import hdbscan
 import pandas as pd
 from sklearn.cluster import DBSCAN
+from itertools import chain
 '''
 def animate(frames,X,img2):
 	#ax1.clear()
@@ -43,15 +44,40 @@ gausB_img2=cv.GaussianBlur(img2, (31,31),0) #denoise to make peak detection easi
 
 nucleus_x=[]
 nucleus_y=[]
-
+row_len = list(range(0,1920))
 for xRow in range(0,1920):
 	row = xRow
 	xVal = gausB_img2[row]
 
-	peaks = find_peaks(xVal,height=200,width=(5,500),distance=75,prominence=150)
+	peaks = find_peaks(xVal,height=150,width=(5,900),distance=75,prominence=200)
 	#print("peaks = {}".format(peaks))
 	peaks_x = peaks[0]
 	peaks_y = peaks[1].get('peak_heights')
+
+	#####
+	'''
+	peak_cwt =  find_peaks_cwt(xVal, widths=np.arange(1,200),min_length=170)
+	'''
+	'''
+	h_m = extrema.h_maxima(xVal,75)
+	'''
+	'''
+	peakcwt_list = []
+	a_index = 0
+
+	for a in peak_cwt:
+		if a==1:
+			peakcwt_list.append(row_len[a_index])
+		else:
+			pass
+		a_index+=1
+	if len(peakcwt_list)>0:
+		for a in hm_list:
+			nucleus_x.append(a)
+			nucleus_y.append(row)
+
+
+	'''#####
 
 	prominences = peak_prominences(xVal,peaks[0])
 	#print("prominences = {}".format(prominences))
@@ -64,26 +90,12 @@ for xRow in range(0,1920):
 			nucleus_y.append(row)
 	else:
 		continue
-	'''
-	print("peaks = {}".format(peaks))
-	print("peaks[0] = {}".format(peaks_x))
-	print("peaks[1] = {}".format(peaks_y))
-	'''
+
+
 
 ########################
 #set up watershed seeds#
 ########################
-'''
-def find_if_close(c1,c2):
-	row1,row2=c1.shape[0],c2.shape[0]
-	for i in xrange(row1):
-		for j in xrange(row2):
-			dist=np.linalg.norm(c1[i]-c2[j])
-			if abs(dist)<20:
-				return True
-			elif i==row1-1 and j==row2-1:
-				return False
-'''
 
 #nucleus_x=list(np.array(nucleus_x).flat)
 #nucleus_y=list(np.array(nucleus_y).flat)
@@ -104,22 +116,87 @@ def ellbound(dataframe,label,r_index):
 	return boundr
 
 mid_val = peak_crd.groupby(['labels']).median() #find median (in y) per cluster (nucleus) to draw for watershed seed
-#print(mid_val)
+
+#print("midval = ",mid_val,"end")
+#print("mid_val['x']={},mid_val['y']={}".format(mid_val['x'][0],mid_val['y'][0]))
 #print(len(mid_val))
 
 seed_kernel=np.ones((3,3),np.uint8)
 i = Image.new("1",(1920,1920),"black")
 wshed_seed = ImageDraw.Draw(i)
 #print(int(mid_val['y'][13]))
+
+#local area intensity scan
+
+'''
+			  o(perph_north)
+			  |
+			  |
+	(perph_east)o-----O-----o(perph_west)
+			  |
+			  |
+			  o(perph_south)
+
+
+'''
+
+i2 = Image.new("1",(1920,1920),"black") #set up background binary image. Using foreround detected points to generate isolation zones as 'unknown' areas.
+bkgrd_seed = ImageDraw.Draw(i2)
+
+mask=np.zeros(img2.shape,np.uint8)
 for a in range(0,len(mid_val)-1):
+	#mask=np.zeros(img2.shape,np.uint8)
 	#print(nucleus_x[a],nucleus_y[a])
 	markerdilate=3
+	bk_dil=30 #radius of unknown exclusion zone for backgound isolation
 	#print(int(mid_val['x'][a]),int(mid_val['y'][a]))
 	y_b=ellbound(mid_val,'y',a)
 	x_b=ellbound(mid_val,'x',a)
 	#print(x_b,y_b)
 	#wshed_seed.ellipse((int(mid_val['x'][a])-markerdilate,int(mid_val['y'][a])-markerdilate,int(mid_val['x'][a])+markerdilate,int(mid_val['y'][a])+markerdilate),"white")
+	c_x = x_b
+	c_y = y_b
+	rad_cen=(c_x,c_y)
+	print("rad_cen=",rad_cen)
+	rad_len_cen=7
+	rad_len_perph=5
+	perph_circ_dist=100
+	perph_circ_cent_north=(c_x,c_y-perph_circ_dist)
+	perph_circ_cent_east=(c_x+perph_circ_dist,c_y)
+	perph_circ_cent_south=(c_x,c_y+perph_circ_dist)
+	perph_circ_cent_west=(c_x-perph_circ_dist,c_y)
+
+	cen_circ=cv.circle(mask,rad_cen,rad_len_cen,255,-1)
+	north_circ=cv.circle(mask,perph_circ_cent_north,rad_len_perph,254,-1)
+	east_circ=cv.circle(mask,perph_circ_cent_east,rad_len_perph,253,-1)
+	south_circ=cv.circle(mask,perph_circ_cent_south,rad_len_perph,252,-1)
+	west_circ=cv.circle(mask,perph_circ_cent_west,rad_len_perph,251,-1)
+
+	where_cen=np.where(mask==255)
+	where_north=np.where(mask==254)
+	where_east=np.where(mask==253)
+	where_south=np.where(mask==252)
+	where_west=np.where(mask==251)
+
+	img_where_cen=img2[where_cen[0],where_cen[1]]
+	img_where_north=img2[where_north[0],where_north[1]]
+	img_where_east=img2[where_east[0],where_east[1]]
+	img_where_south=img2[where_south[0],where_south[1]]
+	img_where_west=img2[where_west[0],where_west[1]]
+	print("img_where_cen = {}".format(img_where_cen))
+	mean_cen=np.mean(img_where_cen)
+	concat_perph=list(chain(img_where_north,img_where_east,img_where_south,img_where_west))
+	print("concat_perph = {}".format(concat_perph))
+	mean_perph=np.mean(concat_perph)
+	print("mean_cen = {}, mean_perph = {}".format(mean_cen,mean_perph))
+	mean_north = np.mean
+	if mean_cen>(mean_perph*1.15):
+		pass
+	else:
+		continue
+
 	wshed_seed.ellipse((x_b-markerdilate,y_b-markerdilate,x_b+markerdilate,y_b+markerdilate),'white')
+	bkgrd_seed.ellipse((x_b-bk_dil,y_b-bk_dil,x_b+bk_dil,y_b+bk_dil),'white')
 	#wshed_seed.point((ellbound(mid_val,'x',a),ellbound(mid_val,'y',a)),'white')
 #group by cluster label
 #find median y per goup and rest of coordinate with it
@@ -134,6 +211,10 @@ wshed_seed = np.array(i)
 wshed_seed_th = np.array(wshed_seed)
 wshed_seed_th = np.multiply(wshed_seed_th,1).astype(np.uint8)
 
+
+bkgrd_seed = np.array(i2)
+bkgrd_seed_th = np.array(bkgrd_seed)
+bkgrd_seed_th = np.multiply(bkgrd_seed_th,1).astype(np.uint8)
 #wshed_seed_2=cv.distanceTransform(wshed_seed,cv.DIST_L2,5)
 #wshed_seed_th=cv.threshold(wshed_seed_th,12,255,cv.THRESH_BINARY)
 #wshed_seed_th=wshed_seed_th[1]
@@ -179,11 +260,18 @@ contour_show = cv.drawContours(img2,unified,-1,(0,255,0),2)
 
 back_img2=(img2/256).astype(np.uint8)
 back_img2=cv.threshold(back_img2,1,255,cv.THRESH_BINARY)
+
 kernel = np.ones((3,3),np.uint8)
 
 #print("img2={}".format(back_img2))
 
 back_img2=cv.dilate(back_img2[1],kernel,iterations=2)
+
+bkgrd_seed_th = bkgrd_seed_th*255
+back_img2=bkgrd_seed_th
+#print("bkgrd_seed= ",bkgrd_seed_th)
+
+
 
 #print("back_img2.shape={}, wshed_seed.shape={}".format(back_img2.shape,wshed_seed.shape))
 #print("back_img2 dtype = {}, wshed_seed dtype = {}".format(back_img2.dtype,wshed_seed.dtype))
@@ -274,9 +362,9 @@ ax1.hlines(y=peaks[1].get("width_heights"),xmin=peaks[1].get("left_ips"),xmax=pe
 ax1.imshow(gausB_img2)
 x = list(range(0,1920))
 y = [row]*len(x)
-y_plot = [row]*len(peaks[0])
+#y_plot = [row]*len(peaks[0])
 ax2.plot(x,y)
-ax2.plot(peaks[0],y_plot,"x")
+#ax2.plot(peaks[0],y_plot,"x")
 ax2.scatter(peak_crd['x'],peak_crd['y'],marker='x',c=peak_crd['labels'])
 ax2.imshow(img2)
 
@@ -286,9 +374,9 @@ ax3 = fig.add_subplot(spec_G[1,0])
 ax3.imshow(wshed_seed)
 
 ax4 = fig.add_subplot(spec_G[1,1])
-ax4.imshow(wshed_show_g)
+#ax4.imshow(wshed_show_g)
 #ax4.imshow(wshed_bound)
-#ax4.imshow(wshed_show_og)
+ax4.imshow(back_img2)
 ax5 = fig.add_subplot(spec_G[1,2])
 
 ax5.imshow(contour_draw)
