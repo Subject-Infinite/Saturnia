@@ -148,33 +148,40 @@ def mean_compare(modifier,cen,per1,per2,per3):
 	perph_list = modifier*np.array(perph_list)
 	return cen>perph_list[0] and cen>perph_list[1] and cen>perph_list[2]
 '''
-def mean_compare_flex(modifier,central,perph_compare,compare_index):
-	iterable=perph_compare
-	iterations=itertools.combinations(iterable,compare_index)
+def mean_compare_flex(modifier,central,perph_compare,compare_index): #to compare mean intensity of cental zone with mean intensity of peripheral zones (perph). If central intensity is brighter than 3(set by compare_index, is variable) of surrounding 4 perphs, return TRUE. perph_compare must be an iterable (lkisst/tuple), this represents a list of the peripheral zone means to compare central means against. modifier is a measure of how much brighter the central zone must be above the peripheral mean being compared, to be considered bright enough. A good ball park figure is 10% brighter, so multiply perph by 1.1.
+	larger_than_perph=0
+	for perph_zone_mean in perph_compare:
+		if central>(perph_zone_mean*modifier):
+			larger_than_perph+=1
+		print("central={},perph_zone_mean={},larger_than_perph={}".format(central,perph_zone_mean,larger_than_perph))
+	if larger_than_perph>=compare_index:
+		return True
+'''
+	set_up_iterations=itertools.combinations(perph_compare,compare_index)
 	iteration_list=[]
-	for ab in iterations:
-		print(ab)
-		iteration_list.append(ab)
-	e=0
+	for iteration_result in set_up_iterations:
+		print(iteration_result)
+		iteration_list.append(iteration_result)
+	is_larger_than_tuple=0
 	print("central=",central)
-	for ac in iteration_list:
-		print("print ac = {}".format(ac))
-		d=0
-		for ax in ac:
-			print("print ax = {}".format(ax))
-			if central>(modifier*ax):
-				d+=1
+	for iteration_tuple in iteration_list:
+		print("print iteration_tuple = {}".format(iteration_tuple))
+		smaller_perph_mean=0
+		for perph_zone_mean in iteration_tuple:
+			print("print perph_zone_mean = {}".format(perph_zone_mean))
+			if central>(modifier*perph_zone_mean):
+				smaller_perph_mean+=1
 			else:
-				d = 0
-		print("d= ",d)
-		if d==len(ac):
-			e+=1
+				smaller_perph_mean = 0
+		print("smaller_perph_mean= ",smaller_perph_mean)
+		if smaller_perph_mean==len(iteration_tuple):
+			is_larger_than_tuple+=1
 		else:
-			e = 0
-	print("e=",e)
-	if e>=1:
-		return e>=1
-
+			is_larger_than_tuple = 0
+	print("is_larger_than_tuple=",is_larger_than_tuple)
+	if is_larger_than_tuple>=1:
+		return is_larger_than_tuple>=1
+'''
 mask=np.zeros(img2.shape,np.uint8)
 for a in range(0,len(mid_val)-1):
 	#mask=np.zeros(img2.shape,np.uint8)
@@ -224,7 +231,7 @@ for a in range(0,len(mid_val)-1):
 	mean_north=np.mean(img_where_north);mean_east=np.mean(img_where_east);mean_south=np.mean(img_where_south);mean_west=np.mean(img_where_west)
 
 	peripheral_means=[mean_north,mean_east,mean_south,mean_west]
-	modifier=1.05
+	modifier=1.1
 	print("mean_compare_flex: ", mean_compare_flex(modifier,mean_cen,peripheral_means,3))
 
 #	if mean_compare(modifier,mean_cen,mean_north,mean_east,mean_south) or mean_compare(modifier,mean_cen,mean_north,mean_east,mean_west) or mean_compare(modifier,mean_cen,mean_north,mean_west,mean_south) or mean_compare(modifier,mean_cen,mean_east,mean_south,mean_west):
