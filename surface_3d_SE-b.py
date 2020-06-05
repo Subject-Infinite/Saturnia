@@ -142,6 +142,38 @@ wshed_seed = ImageDraw.Draw(i)
 
 i2 = Image.new("1",(1920,1920),"black") #set up background binary image. Using foreround detected points to generate isolation zones as 'unknown' areas.
 bkgrd_seed = ImageDraw.Draw(i2)
+'''
+def mean_compare(modifier,cen,per1,per2,per3):
+	perph_list = [per1,per2,per3]
+	perph_list = modifier*np.array(perph_list)
+	return cen>perph_list[0] and cen>perph_list[1] and cen>perph_list[2]
+'''
+def mean_compare_flex(modifier,central,perph_compare,compare_index):
+	iterable=perph_compare
+	iterations=itertools.combinations(iterable,compare_index)
+	iteration_list=[]
+	for ab in iterations:
+		print(ab)
+		iteration_list.append(ab)
+	e=0
+	print("central=",central)
+	for ac in iteration_list:
+		print("print ac = {}".format(ac))
+		d=0
+		for ax in ac:
+			print("print ax = {}".format(ax))
+			if central>(modifier*ax):
+				d+=1
+			else:
+				d = 0
+		print("d= ",d)
+		if d==len(ac):
+			e+=1
+		else:
+			e = 0
+	print("e=",e)
+	if e>=1:
+		return e>=1
 
 mask=np.zeros(img2.shape,np.uint8)
 for a in range(0,len(mid_val)-1):
@@ -183,14 +215,23 @@ for a in range(0,len(mid_val)-1):
 	img_where_east=img2[where_east[0],where_east[1]]
 	img_where_south=img2[where_south[0],where_south[1]]
 	img_where_west=img2[where_west[0],where_west[1]]
-	print("img_where_cen = {}".format(img_where_cen))
+#	print("img_where_cen = {}".format(img_where_cen))
 	mean_cen=np.mean(img_where_cen)
 	concat_perph=list(chain(img_where_north,img_where_east,img_where_south,img_where_west))
-	print("concat_perph = {}".format(concat_perph))
+#	print("concat_perph = {}".format(concat_perph))
 	mean_perph=np.mean(concat_perph)
 	print("mean_cen = {}, mean_perph = {}".format(mean_cen,mean_perph))
-	mean_north = np.mean
-	if mean_cen>(mean_perph*1.15):
+	mean_north=np.mean(img_where_north);mean_east=np.mean(img_where_east);mean_south=np.mean(img_where_south);mean_west=np.mean(img_where_west)
+
+	peripheral_means=[mean_north,mean_east,mean_south,mean_west]
+	modifier=1.05
+	print("mean_compare_flex: ", mean_compare_flex(modifier,mean_cen,peripheral_means,3))
+
+#	if mean_compare(modifier,mean_cen,mean_north,mean_east,mean_south) or mean_compare(modifier,mean_cen,mean_north,mean_east,mean_west) or mean_compare(modifier,mean_cen,mean_north,mean_west,mean_south) or mean_compare(modifier,mean_cen,mean_east,mean_south,mean_west):
+
+	if mean_compare_flex(modifier,mean_cen,peripheral_means,3):
+		print("wololo")
+#	if mean_cen>(mean_perph*1.15):
 		pass
 	else:
 		continue
