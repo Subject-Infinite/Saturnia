@@ -8,10 +8,13 @@ from matplotlib.animation import FuncAnimation
 from scipy.signal import find_peaks, peak_prominences, find_peaks_cwt
 from PIL import Image, ImageDraw
 from skimage.morphology import extrema
+from skimage.feature import peak_local_max
 #import hdbscan
 import pandas as pd
 from sklearn.cluster import DBSCAN
 from itertools import chain
+#import peakutils
+
 '''
 def animate(frames,X,img2):
 	#ax1.clear()
@@ -34,51 +37,57 @@ def animate(frames,X,img2):
 #Detect features#
 #################
 
-#im = "nm_t011_z140_c002.tif"
+im = "nm_t011_z140_c002.tif"
 #im = "nm_t016_z001_c002.tif"
 #im = "nm_t065_z211_c002.tif"
 #im = "nm_t011_z244_c002.tif"
-im = "nm_t011_z082_c002.tif"
+#im = "nm_t011_z082_c002.tif"
 img2 = np.array(cv.imread(im,-1))
 gausB_img2=cv.GaussianBlur(img2, (31,31),0) #denoise to make peak detection easier
 
 nucleus_x=[]
 nucleus_y=[]
+nucleus_intense=[]
 row_len = list(range(0,1920))
 for xRow in range(0,1920):
 	row = xRow
 	xVal = gausB_img2[row]
-
-	peaks = find_peaks(xVal,height=150,width=(5,900),distance=75,prominence=200)
+	'''
+	p_l_m=peak_local_max(xVal,threshold_rel=0.9,min_distance=100)
+	plm_list=[]
+	for a in p_l_m:
+		plm_list.append(a[0])
+	plm_list.reverse()
+	for peak_index in plm_list:
+		nucleus_x.append(peak_index)
+		nucleus_y.append(xVal[peak_index])'''
+	peaks = find_peaks(xVal,height=475,width=(5,900),distance=75,prominence=150)
 	#print("peaks = {}".format(peaks))
 	peaks_x = peaks[0]
 	peaks_y = peaks[1].get('peak_heights')
-
 	#####
 	'''
 	peak_cwt =  find_peaks_cwt(xVal, widths=np.arange(1,200),min_length=170)
 	'''
 	'''
-	h_m = extrema.h_maxima(xVal,75)
-	'''
-	'''
-	peakcwt_list = []
+	h_m = extrema.h_maxima(xVal,500)
+
+
+	hm_list = []
 	a_index = 0
 
-	for a in peak_cwt:
+	for a in h_m:
 		if a==1:
-			peakcwt_list.append(row_len[a_index])
+			hm_list.append(row_len[a_index])
 		else:
 			pass
 		a_index+=1
-	if len(peakcwt_list)>0:
+	if len(hm_list)>0:
 		for a in hm_list:
 			nucleus_x.append(a)
 			nucleus_y.append(row)
 
-
-	'''#####
-
+	'''
 	prominences = peak_prominences(xVal,peaks[0])
 	#print("prominences = {}".format(prominences))
 	contour_heights = xVal[peaks_x] - prominences[0]
@@ -88,10 +97,9 @@ for xRow in range(0,1920):
 		for a in peaks_x:
 			nucleus_x.append(a)
 			nucleus_y.append(row)
+			nucleus_intense.append(xVal[a])
 	else:
 		continue
-
-
 
 ########################
 #set up watershed seeds#
@@ -102,24 +110,124 @@ for xRow in range(0,1920):
 #print(nucleus_x)
 #print(nucleus_y)
 
-peak_crd = pd.DataFrame(list(zip(nucleus_x,nucleus_y)),columns=['x','y'])
+peak_crd = pd.DataFrame(list(zip(nucleus_x,nucleus_y,nucleus_intense)),columns=['x','y','intensity'])
+
 #print(peak_crd)
 #clusterer = hdbscan.HDBSCAN(min_cluster_size=7,min_samples=1).fit(peak_crd)
-clusterer = DBSCAN(eps=20,min_samples=5).fit(peak_crd)
+
+clusterer = DBSCAN(eps=50,min_samples=8,algorithm='ball_tree').fit(peak_crd)
+
 #print(clusterer)
 #print(clusterer.labels_)
 peak_crd['labels'] = clusterer.labels_
-#print(peak_crd)
+print(peak_crd)
 
 def ellbound(dataframe,label,r_index):
 	boundr=int(dataframe[str(label)][r_index])
 	return boundr
 
+#lab_grp=peak_crd.groupby(['labels']).mode()
+#print("lab_group = ", lab_grp)
+
 mid_val = peak_crd.groupby(['labels']).median() #find median (in y) per cluster (nucleus) to draw for watershed seed
 
 #print("midval = ",mid_val,"end")
+
+dbscan_labels =mid_val.index.tolist()
+print("dbscan_labels",dbscan_labels)
+labels_values_col=list(peak_crd.columns)
+bright_window=pd.DataFrame(columns=labels_values_col)
+for labels in dbscan_labels:
+	if labels==-1 or labels==0:
+		continue
+	else:
+		print("labels = ", labels)
+		labels_values=peak_crd.loc[peak_crd['labels']==labels]
+		#print("labels_values = {}".format(labels_values))
+		#labels_values_col=list(labels_values.columns)
+		print("labels_values_col",labels_values_col)
+		loop_timer=0
+		print("labels_values={},len(labels_values)={})".format(labels_values,len(labels_values)))
+		for a in range(0,len(labels_values)-4):
+			#print("loop_timer=",loop_timer)
+			aa=labels_values['intensity'].iloc[a]
+			ab=labels_values['intensity'].iloc[a+1]
+			ac=labels_values['intensity'].iloc[a+2]
+			ad=labels_values['intensity'].iloc[a+3]
+			ae=labels_values['intensity'].iloc[a+4]
+
+			print("ae={},ab={},ac={},ad={},ae={},loop_iteration={}".format(aa,ab,ac,ad,ae,loop_timer))
+			slid_win_array = np.array([aa,ab,ac,ad,ae])
+			sliding_window_median = np.median(slid_win_array)
+			#sliding_window_max = np.amax(slid_win_array)
+			sliding_window_df = pd.DataFrame(columns=labels_values_col)
+			print("sliding_window_median = ", sliding_window_median)
+			if loop_timer==0:
+				high_med=sliding_window_median
+				swd_input_dict={'x':labels_values['x'].iloc[a:a+4],'y':labels_values['y'].iloc[a:a+4],'intensity':labels_values['intensity'].iloc[a:a+4],'labels':labels_values['labels'].iloc[a:a+4]}
+				print("swd_input_dict= ", swd_input_dict)
+
+				swd_input_dicta={'x':labels_values['x'].iloc[a],'y':labels_values['y'].iloc[a],'intensity':labels_values['intensity'].iloc[a],'labels':labels_values['labels'].iloc[a]}
+				swd_input_dictb={'x':labels_values['x'].iloc[a+1],'y':labels_values['y'].iloc[a+1],'intensity':labels_values['intensity'].iloc[a+1],'labels':labels_values['labels'].iloc[a+1]}
+				swd_input_dictc={'x':labels_values['x'].iloc[a+2],'y':labels_values['y'].iloc[a+2],'intensity':labels_values['intensity'].iloc[a+2],'labels':labels_values['labels'].iloc[a+2]}
+				swd_input_dictd={'x':labels_values['x'].iloc[a+3],'y':labels_values['y'].iloc[a+3],'intensity':labels_values['intensity'].iloc[a+3],'labels':labels_values['labels'].iloc[a+3]}
+				swd_input_dicte={'x':labels_values['x'].iloc[a+4],'y':labels_values['y'].iloc[a+4],'intensity':labels_values['intensity'].iloc[a+4],'labels':labels_values['labels'].iloc[a+4]}
+				sliding_window_df=sliding_window_df.append(swd_input_dicta,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictb,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictc,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictd,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dicte,ignore_index=True)
+
+				print("sliding_window_df",sliding_window_df)
+				sliding_window_max2=sliding_window_df[sliding_window_df['intensity']==sliding_window_df['intensity'].max()]
+				print("sliding_window_max2",sliding_window_max2)
+				#sliding_window_max3=sliding_window_max2['intensity']
+				#print("sliding_window_max3=",sliding_window_max3)
+				mid_swm2=sliding_window_max2.median()
+				print("mid_swm2 = ", mid_swm2)
+				sliding_window_max=np.amax(slid_win_array)
+
+			elif high_med<sliding_window_median:
+				high_med=sliding_window_median
+				swd_input_dict={'x':labels_values['x'].iloc[a:a+4],'y':labels_values['y'].iloc[a:a+4],'intensity':labels_values['intensity'].iloc[a:a+4],'labels':labels_values['labels'].iloc[a:a+4]}
+				print("swd_input_dict= ", swd_input_dict)
+
+				swd_input_dicta={'x':labels_values['x'].iloc[a],'y':labels_values['y'].iloc[a],'intensity':labels_values['intensity'].iloc[a],'labels':labels_values['labels'].iloc[a]}
+				swd_input_dictb={'x':labels_values['x'].iloc[a+1],'y':labels_values['y'].iloc[a+1],'intensity':labels_values['intensity'].iloc[a+1],'labels':labels_values['labels'].iloc[a+1]}
+				swd_input_dictc={'x':labels_values['x'].iloc[a+2],'y':labels_values['y'].iloc[a+2],'intensity':labels_values['intensity'].iloc[a+2],'labels':labels_values['labels'].iloc[a+2]}
+				swd_input_dictd={'x':labels_values['x'].iloc[a+3],'y':labels_values['y'].iloc[a+3],'intensity':labels_values['intensity'].iloc[a+3],'labels':labels_values['labels'].iloc[a+3]}
+				swd_input_dicte={'x':labels_values['x'].iloc[a+4],'y':labels_values['y'].iloc[a+4],'intensity':labels_values['intensity'].iloc[a+4],'labels':labels_values['labels'].iloc[a+4]}
+				sliding_window_df=sliding_window_df.append(swd_input_dicta,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictb,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictc,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictd,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dicte,ignore_index=True)
+
+				print("sliding_window_df",sliding_window_df)
+				sliding_window_max2=sliding_window_df[sliding_window_df['intensity']==sliding_window_df['intensity'].max()]
+				print("sliding_window_max2",sliding_window_max2)
+				#sliding_window_max3=sliding_window_max2['intensity']
+				#print("sliding_window_max3=",sliding_window_max3)
+				mid_swm2=sliding_window_max2.median()
+				print("mid_swm2 = ", mid_swm2)
+
+				sliding_window_max=np.amax(slid_win_array)
+			indexes_for_new_frame = labels_values.index[labels_values['intensity']==sliding_window_max]
+			print("indexes_for_new_frame = ",indexes_for_new_frame)
+			input_dict={'x':labels_values.loc[indexes_for_new_frame[0],'x'],'y':labels_values.loc[indexes_for_new_frame[0],'y'],'intensity':labels_values.loc[indexes_for_new_frame[0],'intensity'],'labels':labels_values.loc[indexes_for_new_frame[0],'labels']}
+			print("input_dict = ",input_dict)
+			print(labels_values.loc[indexes_for_new_frame[0],'x'])
+			#bright_window=pd.DataFrame(columns=labels_values_col)
+			loop_timer+=1
+			if loop_timer==(len(labels_values)-4):
+				#bright_window.append({'x':labels_values.loc[indexes_for_new_frame[0],'x'],'y':labels_values.loc[indexes_for_new_frame[0],'y'],'intensity':labels_values.loc[indexes_for_new_frame[0],'intensity'],'labels':labels_values.loc[indexes_for_new_frame[0],'labels']},ignore_index=True)
+				#pd.concat(bright_window,labels_values.loc[indexes_for_new_frame[0],:])
+				bright_window=bright_window.append(input_dict,ignore_index=True)
+				print("bright_window",bright_window)
 #print("mid_val['x']={},mid_val['y']={}".format(mid_val['x'][0],mid_val['y'][0]))
 #print(len(mid_val))
+
+mid_val = bright_window
 
 seed_kernel=np.ones((3,3),np.uint8)
 i = Image.new("1",(1920,1920),"black")
@@ -142,16 +250,20 @@ wshed_seed = ImageDraw.Draw(i)
 
 i2 = Image.new("1",(1920,1920),"black") #set up background binary image. Using foreround detected points to generate isolation zones as 'unknown' areas.
 bkgrd_seed = ImageDraw.Draw(i2)
+
 '''
 def mean_compare(modifier,cen,per1,per2,per3):
 	perph_list = [per1,per2,per3]
 	perph_list = modifier*np.array(perph_list)
 	return cen>perph_list[0] and cen>perph_list[1] and cen>perph_list[2]
 '''
+
 def mean_compare_flex(modifier,central,perph_compare,compare_index): #to compare mean intensity of cental zone with mean intensity of peripheral zones (perph). If central intensity is brighter than 3(set by compare_index, is variable) of surrounding 4 perphs, return TRUE. perph_compare must be an iterable (lkisst/tuple), this represents a list of the peripheral zone means to compare central means against. modifier is a measure of how much brighter the central zone must be above the peripheral mean being compared, to be considered bright enough. A good ball park figure is 10% brighter, so multiply perph by 1.1.
 	larger_than_perph=0
 	for perph_zone_mean in perph_compare:
-		if central>(perph_zone_mean*modifier):
+		#if central>(perph_zone_mean*(1+(central/modifier))):
+		if (central/perph_zone_mean)>=(1.02+(((10/59)*central)-(5079/59))/100):
+		#if (central/perph_zone_mean)>(1+(central/modifier)):
 			larger_than_perph+=1
 		print("central={},perph_zone_mean={},larger_than_perph={}".format(central,perph_zone_mean,larger_than_perph))
 	if larger_than_perph>=compare_index:
@@ -197,9 +309,9 @@ for a in range(0,len(mid_val)-1):
 	c_y = y_b
 	rad_cen=(c_x,c_y)
 	print("rad_cen=",rad_cen)
-	rad_len_cen=7
+	rad_len_cen=9
 	rad_len_perph=5
-	perph_circ_dist=100
+	perph_circ_dist=49
 	perph_circ_cent_north=(c_x,c_y-perph_circ_dist)
 	perph_circ_cent_east=(c_x+perph_circ_dist,c_y)
 	perph_circ_cent_south=(c_x,c_y+perph_circ_dist)
@@ -229,9 +341,10 @@ for a in range(0,len(mid_val)-1):
 	mean_perph=np.mean(concat_perph)
 	print("mean_cen = {}, mean_perph = {}".format(mean_cen,mean_perph))
 	mean_north=np.mean(img_where_north);mean_east=np.mean(img_where_east);mean_south=np.mean(img_where_south);mean_west=np.mean(img_where_west)
+#	mean_north=np.median(img_where_north);mean_east=np.median(img_where_east);mean_south=np.median(img_where_south);mean_west=np.median(img_where_west)
 
 	peripheral_means=[mean_north,mean_east,mean_south,mean_west]
-	modifier=1.1
+	modifier=4250
 	print("mean_compare_flex: ", mean_compare_flex(modifier,mean_cen,peripheral_means,3))
 
 #	if mean_compare(modifier,mean_cen,mean_north,mean_east,mean_south) or mean_compare(modifier,mean_cen,mean_north,mean_east,mean_west) or mean_compare(modifier,mean_cen,mean_north,mean_west,mean_south) or mean_compare(modifier,mean_cen,mean_east,mean_south,mean_west):
@@ -401,6 +514,8 @@ ax0 = fig.add_subplot(spec_G[0,0])
 ax1 = fig.add_subplot(spec_G[0,1])
 ax2 = fig.add_subplot(spec_G[0,2])
 ax0.imshow(img2)
+
+
 '''
 ax1.plot(list(range(0,1920)),xVal)
 ax1.plot(peaks_x,peaks_y,"x")
