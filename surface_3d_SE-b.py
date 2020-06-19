@@ -2,16 +2,17 @@ import cv2 as cv
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib import gridspec
-from PIL import Image
+#from PIL import Image
 import itertools # import permutations, product
 from matplotlib.animation import FuncAnimation
 from scipy.signal import find_peaks, peak_prominences, find_peaks_cwt
 from PIL import Image, ImageDraw
-from skimage.morphology import extrema
-from skimage.feature import peak_local_max
+#from skimage.morphology import extrema
+#from skimage.feature import peak_local_max
 #import hdbscan
 import pandas as pd
 from sklearn.cluster import DBSCAN
+#from sklearn.neighbors import NearestNeighbors
 from itertools import chain
 #import peakutils
 
@@ -61,7 +62,7 @@ for xRow in range(0,1920):
 	for peak_index in plm_list:
 		nucleus_x.append(peak_index)
 		nucleus_y.append(xVal[peak_index])'''
-	peaks = find_peaks(xVal,height=475,width=(5,900),distance=75,prominence=150)
+	peaks = find_peaks(xVal,height=375,width=(20,900),distance=75,prominence=150)
 	#print("peaks = {}".format(peaks))
 	peaks_x = peaks[0]
 	peaks_y = peaks[1].get('peak_heights')
@@ -115,8 +116,8 @@ peak_crd = pd.DataFrame(list(zip(nucleus_x,nucleus_y,nucleus_intense)),columns=[
 #print(peak_crd)
 #clusterer = hdbscan.HDBSCAN(min_cluster_size=7,min_samples=1).fit(peak_crd)
 
-clusterer = DBSCAN(eps=50,min_samples=8,algorithm='ball_tree').fit(peak_crd)
-
+clusterer = DBSCAN(eps=50,min_samples=5,algorithm='auto').fit(peak_crd)
+#clusterer = NearestNeighbors(n_neighbors=5,radius=30).fit(peak_crd)
 #print(clusterer)
 #print(clusterer.labels_)
 peak_crd['labels'] = clusterer.labels_
@@ -138,7 +139,9 @@ print("dbscan_labels",dbscan_labels)
 labels_values_col=list(peak_crd.columns)
 bright_window=pd.DataFrame(columns=labels_values_col)
 for labels in dbscan_labels:
-	if labels==-1 or labels==0:
+	#if labels==-1 or labels==0:
+	if 7==8:
+	#if labels==0:
 		continue
 	else:
 		print("labels = ", labels)
@@ -148,6 +151,8 @@ for labels in dbscan_labels:
 		print("labels_values_col",labels_values_col)
 		loop_timer=0
 		print("labels_values={},len(labels_values)={})".format(labels_values,len(labels_values)))
+		median_list=[]
+		median_iteration_list=[]
 		for a in range(0,len(labels_values)-4):
 			#print("loop_timer=",loop_timer)
 			aa=labels_values['intensity'].iloc[a]
@@ -160,58 +165,14 @@ for labels in dbscan_labels:
 			slid_win_array = np.array([aa,ab,ac,ad,ae])
 			sliding_window_median = np.median(slid_win_array)
 			#sliding_window_max = np.amax(slid_win_array)
-			sliding_window_df = pd.DataFrame(columns=labels_values_col)
+
 			print("sliding_window_median = ", sliding_window_median)
-			if loop_timer==0:
-				high_med=sliding_window_median
-				swd_input_dict={'x':labels_values['x'].iloc[a:a+4],'y':labels_values['y'].iloc[a:a+4],'intensity':labels_values['intensity'].iloc[a:a+4],'labels':labels_values['labels'].iloc[a:a+4]}
-				print("swd_input_dict= ", swd_input_dict)
 
-				swd_input_dicta={'x':labels_values['x'].iloc[a],'y':labels_values['y'].iloc[a],'intensity':labels_values['intensity'].iloc[a],'labels':labels_values['labels'].iloc[a]}
-				swd_input_dictb={'x':labels_values['x'].iloc[a+1],'y':labels_values['y'].iloc[a+1],'intensity':labels_values['intensity'].iloc[a+1],'labels':labels_values['labels'].iloc[a+1]}
-				swd_input_dictc={'x':labels_values['x'].iloc[a+2],'y':labels_values['y'].iloc[a+2],'intensity':labels_values['intensity'].iloc[a+2],'labels':labels_values['labels'].iloc[a+2]}
-				swd_input_dictd={'x':labels_values['x'].iloc[a+3],'y':labels_values['y'].iloc[a+3],'intensity':labels_values['intensity'].iloc[a+3],'labels':labels_values['labels'].iloc[a+3]}
-				swd_input_dicte={'x':labels_values['x'].iloc[a+4],'y':labels_values['y'].iloc[a+4],'intensity':labels_values['intensity'].iloc[a+4],'labels':labels_values['labels'].iloc[a+4]}
-				sliding_window_df=sliding_window_df.append(swd_input_dicta,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictb,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictc,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictd,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dicte,ignore_index=True)
+			sliding_window_max=np.amax(slid_win_array)
+			median_list.append(sliding_window_median)
+			median_iteration_list.append(a)
 
-				print("sliding_window_df",sliding_window_df)
-				sliding_window_max2=sliding_window_df[sliding_window_df['intensity']==sliding_window_df['intensity'].max()]
-				print("sliding_window_max2",sliding_window_max2)
-				#sliding_window_max3=sliding_window_max2['intensity']
-				#print("sliding_window_max3=",sliding_window_max3)
-				mid_swm2=sliding_window_max2.median()
-				print("mid_swm2 = ", mid_swm2)
-				sliding_window_max=np.amax(slid_win_array)
 
-			elif high_med<sliding_window_median:
-				high_med=sliding_window_median
-				swd_input_dict={'x':labels_values['x'].iloc[a:a+4],'y':labels_values['y'].iloc[a:a+4],'intensity':labels_values['intensity'].iloc[a:a+4],'labels':labels_values['labels'].iloc[a:a+4]}
-				print("swd_input_dict= ", swd_input_dict)
-
-				swd_input_dicta={'x':labels_values['x'].iloc[a],'y':labels_values['y'].iloc[a],'intensity':labels_values['intensity'].iloc[a],'labels':labels_values['labels'].iloc[a]}
-				swd_input_dictb={'x':labels_values['x'].iloc[a+1],'y':labels_values['y'].iloc[a+1],'intensity':labels_values['intensity'].iloc[a+1],'labels':labels_values['labels'].iloc[a+1]}
-				swd_input_dictc={'x':labels_values['x'].iloc[a+2],'y':labels_values['y'].iloc[a+2],'intensity':labels_values['intensity'].iloc[a+2],'labels':labels_values['labels'].iloc[a+2]}
-				swd_input_dictd={'x':labels_values['x'].iloc[a+3],'y':labels_values['y'].iloc[a+3],'intensity':labels_values['intensity'].iloc[a+3],'labels':labels_values['labels'].iloc[a+3]}
-				swd_input_dicte={'x':labels_values['x'].iloc[a+4],'y':labels_values['y'].iloc[a+4],'intensity':labels_values['intensity'].iloc[a+4],'labels':labels_values['labels'].iloc[a+4]}
-				sliding_window_df=sliding_window_df.append(swd_input_dicta,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictb,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictc,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dictd,ignore_index=True)
-				sliding_window_df=sliding_window_df.append(swd_input_dicte,ignore_index=True)
-
-				print("sliding_window_df",sliding_window_df)
-				sliding_window_max2=sliding_window_df[sliding_window_df['intensity']==sliding_window_df['intensity'].max()]
-				print("sliding_window_max2",sliding_window_max2)
-				#sliding_window_max3=sliding_window_max2['intensity']
-				#print("sliding_window_max3=",sliding_window_max3)
-				mid_swm2=sliding_window_max2.median()
-				print("mid_swm2 = ", mid_swm2)
-
-				sliding_window_max=np.amax(slid_win_array)
 			indexes_for_new_frame = labels_values.index[labels_values['intensity']==sliding_window_max]
 			print("indexes_for_new_frame = ",indexes_for_new_frame)
 			input_dict={'x':labels_values.loc[indexes_for_new_frame[0],'x'],'y':labels_values.loc[indexes_for_new_frame[0],'y'],'intensity':labels_values.loc[indexes_for_new_frame[0],'intensity'],'labels':labels_values.loc[indexes_for_new_frame[0],'labels']}
@@ -220,6 +181,49 @@ for labels in dbscan_labels:
 			#bright_window=pd.DataFrame(columns=labels_values_col)
 			loop_timer+=1
 			if loop_timer==(len(labels_values)-4):
+				print("median_list = ", median_list)
+				max_median_list=max(median_list)
+				enumeration_l=[]
+				list_mid_ticker=0
+				for val in median_list:
+					if val==max_median_list:
+						enumeration_l.append(list_mid_ticker)
+					list_mid_ticker+=1
+				median_max_index=median_iteration_list[int(np.median(enumeration_l))]
+				print("index of interest = ", median_max_index)
+				print("max_median_list = ", max_median_list)
+				a = median_max_index
+				aa=labels_values['intensity'].iloc[a]
+				ab=labels_values['intensity'].iloc[a+1]
+				ac=labels_values['intensity'].iloc[a+2]
+				ad=labels_values['intensity'].iloc[a+3]
+				ae=labels_values['intensity'].iloc[a+4]
+
+				slid_win_array = np.array([aa,ab,ac,ad,ae])
+				sliding_window_max=np.amax(slid_win_array)
+				print("sliding_window_max = ",sliding_window_max)
+				sliding_window_df = pd.DataFrame(columns=labels_values_col)
+				swd_input_dicta={'x':labels_values['x'].iloc[a],'y':labels_values['y'].iloc[a],'intensity':labels_values['intensity'].iloc[a],'labels':labels_values['labels'].iloc[a]}
+				swd_input_dictb={'x':labels_values['x'].iloc[a+1],'y':labels_values['y'].iloc[a+1],'intensity':labels_values['intensity'].iloc[a+1],'labels':labels_values['labels'].iloc[a+1]}
+				swd_input_dictc={'x':labels_values['x'].iloc[a+2],'y':labels_values['y'].iloc[a+2],'intensity':labels_values['intensity'].iloc[a+2],'labels':labels_values['labels'].iloc[a+2]}
+				swd_input_dictd={'x':labels_values['x'].iloc[a+3],'y':labels_values['y'].iloc[a+3],'intensity':labels_values['intensity'].iloc[a+3],'labels':labels_values['labels'].iloc[a+3]}
+				swd_input_dicte={'x':labels_values['x'].iloc[a+4],'y':labels_values['y'].iloc[a+4],'intensity':labels_values['intensity'].iloc[a+4],'labels':labels_values['labels'].iloc[a+4]}
+				sliding_window_df=sliding_window_df.append(swd_input_dicta,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictb,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictc,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dictd,ignore_index=True)
+				sliding_window_df=sliding_window_df.append(swd_input_dicte,ignore_index=True)
+
+				indexes_for_new_frame = labels_values.index[labels_values['intensity']==sliding_window_max]
+				print("sliding_window_df",sliding_window_df)
+
+				#sliding_window_max2=sliding_window_df[sliding_window_df['intensity']==sliding_window_df['intensity'].max()]
+				#print("sliding_window_max2",sliding_window_max2)
+				#sliding_window_max3=sliding_window_max2['intensity']
+				#print("sliding_window_max3=",sliding_window_max3)
+				#mid_swm2=sliding_window_max2.median()
+				#print("mid_swm2 = ", mid_swm2)
+				input_dict={'x':labels_values.loc[indexes_for_new_frame[0],'x'],'y':labels_values.loc[indexes_for_new_frame[0],'y'],'intensity':labels_values.loc[indexes_for_new_frame[0],'intensity'],'labels':labels_values.loc[indexes_for_new_frame[0],'labels']}
 				#bright_window.append({'x':labels_values.loc[indexes_for_new_frame[0],'x'],'y':labels_values.loc[indexes_for_new_frame[0],'y'],'intensity':labels_values.loc[indexes_for_new_frame[0],'intensity'],'labels':labels_values.loc[indexes_for_new_frame[0],'labels']},ignore_index=True)
 				#pd.concat(bright_window,labels_values.loc[indexes_for_new_frame[0],:])
 				bright_window=bright_window.append(input_dict,ignore_index=True)
@@ -261,8 +265,9 @@ def mean_compare(modifier,cen,per1,per2,per3):
 def mean_compare_flex(modifier,central,perph_compare,compare_index): #to compare mean intensity of cental zone with mean intensity of peripheral zones (perph). If central intensity is brighter than 3(set by compare_index, is variable) of surrounding 4 perphs, return TRUE. perph_compare must be an iterable (lkisst/tuple), this represents a list of the peripheral zone means to compare central means against. modifier is a measure of how much brighter the central zone must be above the peripheral mean being compared, to be considered bright enough. A good ball park figure is 10% brighter, so multiply perph by 1.1.
 	larger_than_perph=0
 	for perph_zone_mean in perph_compare:
+		if central>modifier*perph_zone_mean:
 		#if central>(perph_zone_mean*(1+(central/modifier))):
-		if (central/perph_zone_mean)>=(1.02+(((10/59)*central)-(5079/59))/100):
+		#if (central/perph_zone_mean)>=(1.02+(((10/59)*central)-(5079/59))/100):
 		#if (central/perph_zone_mean)>(1+(central/modifier)):
 			larger_than_perph+=1
 		print("central={},perph_zone_mean={},larger_than_perph={}".format(central,perph_zone_mean,larger_than_perph))
@@ -310,8 +315,8 @@ for a in range(0,len(mid_val)-1):
 	rad_cen=(c_x,c_y)
 	print("rad_cen=",rad_cen)
 	rad_len_cen=9
-	rad_len_perph=5
-	perph_circ_dist=49
+	rad_len_perph=9
+	perph_circ_dist=29
 	perph_circ_cent_north=(c_x,c_y-perph_circ_dist)
 	perph_circ_cent_east=(c_x+perph_circ_dist,c_y)
 	perph_circ_cent_south=(c_x,c_y+perph_circ_dist)
@@ -328,7 +333,7 @@ for a in range(0,len(mid_val)-1):
 	where_east=np.where(mask==253)
 	where_south=np.where(mask==252)
 	where_west=np.where(mask==251)
-
+#	print("where_cen={}".format(where_cen))
 	img_where_cen=img2[where_cen[0],where_cen[1]]
 	img_where_north=img2[where_north[0],where_north[1]]
 	img_where_east=img2[where_east[0],where_east[1]]
@@ -344,7 +349,7 @@ for a in range(0,len(mid_val)-1):
 #	mean_north=np.median(img_where_north);mean_east=np.median(img_where_east);mean_south=np.median(img_where_south);mean_west=np.median(img_where_west)
 
 	peripheral_means=[mean_north,mean_east,mean_south,mean_west]
-	modifier=4250
+	modifier=1.1
 	print("mean_compare_flex: ", mean_compare_flex(modifier,mean_cen,peripheral_means,3))
 
 #	if mean_compare(modifier,mean_cen,mean_north,mean_east,mean_south) or mean_compare(modifier,mean_cen,mean_north,mean_east,mean_west) or mean_compare(modifier,mean_cen,mean_north,mean_west,mean_south) or mean_compare(modifier,mean_cen,mean_east,mean_south,mean_west):
@@ -458,10 +463,29 @@ uniq_wshed = np.unique(wshed_show)
 
 #determine the amount of pixels per watershed region, determines area. we want to remove watersheds above certain value. Turn pixel values above certain value to -1
 #tidying watershed output
+
+
+wshed_mask=np.zeros(img2.shape,np.uint8)
+corona_wshed_delta=1.05
 for a in uniq_wshed:
 	occur=np.count_nonzero(wshed_show==a)
 	print("{} frequency = {}".format(a,occur))
 	if occur > 5000 or occur < 30: ######################################################## size threshold
+		wshed_show = np.where(wshed_show==a,-1,wshed_show)
+		pass
+	wshed_mask_im=np.where(wshed_show==a,np.uint8(255),np.uint8(0))
+	wshed_mask=np.where(wshed_show==a)
+	#print(wshed_mask)
+	wshed_intensities=img2[wshed_mask[0],wshed_mask[1]]
+	#print(wshed_intensities)
+	wshed_mask_dilate=cv.dilate(wshed_mask_im,kernel,iterations=10)
+	wshed_corona=cv.subtract(wshed_mask_dilate,wshed_mask_im)
+	wshed_corona_mask=np.where(wshed_corona>0)
+	print("wshed_corona = ", wshed_corona_mask)
+	wshed_corona_intensities=img2[wshed_corona_mask[0],wshed_corona_mask[1]]
+	print("wshed_corona_intensities = ", wshed_corona_intensities)
+	print("mean wshed intensity = {}, mean corona intensity = {}".format(np.mean(wshed_intensities),np.mean(wshed_corona_intensities)))
+	if np.mean(wshed_intensities)<(corona_wshed_delta*np.mean(wshed_corona_intensities)):
 		wshed_show = np.where(wshed_show==a,-1,wshed_show)
 
 print(uniq_wshed)
@@ -543,6 +567,7 @@ ax4.imshow(back_img2)
 ax5 = fig.add_subplot(spec_G[1,2])
 
 ax5.imshow(contour_draw)
+#ax5.imshow(wshed_corona)
 
 plt.show()
 plt.clf
