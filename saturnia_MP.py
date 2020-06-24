@@ -6,6 +6,7 @@ from matplotlib import pyplot as plt
 from matplotlib import gridspec
 import itertools 
 from scipy.signal import find_peaks, peak_prominences
+from skimage.segmentation import flood, flood_fill
 from PIL import Image, ImageDraw
 import pandas as pd
 from sklearn.cluster import DBSCAN
@@ -327,7 +328,11 @@ class segment_2D:
 			#print(len(contours[0]))
 			#print(contours[10])
 			blank_canvas=np.zeros(img2.shape,np.uint8)
-			contour_draw=cv.drawContours(blank_canvas,contours,-1,(255,255,255),thickness=-1) #draw contours on blank image
+			contour_draw=cv.drawContours(blank_canvas,contours,-1,color=(255,255,255),thickness=-1) #draw contours on blank image
+			#contour_draw_fill=flood_fill(contour_draw, (0,0),255)
+			
+			#contour_draw_fill = np.multiply(contour_draw_fill,255).astype(np.uint8)
+			
 			#contour_draw=cv.drawContours(eightB_img2,contours,-1,(255,255,255),1) #overlay contours on source
 		
 			cv.imwrite(name[:-4]+"_seg.tif",contour_draw) #output
@@ -340,7 +345,7 @@ class segment_2D:
 				curdir=os.chdir(dir)
 				self.listdirec=os.listdir(curdir)
 				
-				with Pool(5) as p:
+				with Pool(3) as p:
 					p.map(self.sliceBySlice,self.listdirec)
 					os.chdir(curdirA)
 
