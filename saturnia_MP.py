@@ -328,14 +328,27 @@ class segment_2D:
 			#print(len(contours[0]))
 			#print(contours[10])
 			blank_canvas=np.zeros(img2.shape,np.uint8)
-			contour_draw=cv.drawContours(blank_canvas,contours,-1,color=(255,255,255),thickness=-1) #draw contours on blank image
-			#contour_draw_fill=flood_fill(contour_draw, (0,0),255)
+			contour_draw=cv.drawContours(blank_canvas,contours,-1,color=255) #draw contours on blank image
 			
+			#blanc_mask=np.zeros((contour_draw.shape[0]+2,contour_draw.shape[1]+2),np.uint8)
+			#print(blanc_mask.shape, contour_draw.shape)
+			#contour_draw_fill=cv.floodFill(contour_draw,  blanc_mask, (0,0),255,0,0,flags=8)
+			
+			blanc_mask=np.zeros((contour_draw.shape[0]-2,contour_draw.shape[1]-2),np.uint8)
+			#print(blanc_mask.shape, contour_draw.shape)
+			contour_draw_fill=cv.floodFill(blanc_mask, contour_draw, (0,0),120)
+			contour_draw_fill=np.where(contour_draw_fill[1]==0,255,contour_draw_fill[1])
+			contour_draw_fill=np.where(contour_draw_fill==120,0,contour_draw_fill)
+			#contour_draw_fill=flood_fill(contour_draw,(0,0),255)
+			#flood_fill(contour_draw,(0,0),200)
+			#print(contour_draw_fill)
 			#contour_draw_fill = np.multiply(contour_draw_fill,255).astype(np.uint8)
 			
 			#contour_draw=cv.drawContours(eightB_img2,contours,-1,(255,255,255),1) #overlay contours on source
-		
-			cv.imwrite(name[:-4]+"_seg.tif",contour_draw) #output
+			#cv.imwrite(name[:-4]+"_seg.tif",blanc_mask) #output
+			#cv.imwrite(name[:-4]+"_seg.tif",contour_draw_fill) #output
+			cv.imwrite(name[:-4]+"_seg.tif",contour_draw_fill) #output
+
 
 	def __init__(self):
 		curdirA=os.getcwd()
