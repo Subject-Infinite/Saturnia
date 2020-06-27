@@ -13,13 +13,20 @@ from sklearn.cluster import DBSCAN
 from itertools import chain
 import os
 import os.path
-from multiprocessing import Pool
+from os.path import basename
+from multiprocessing import Pool, Value, Lock, Manager
+from ctypes import c_char_p
+from pathlib import Path
 
 class segment_2D:
 	def sliceBySlice(self, name):
 		#################
 		#Detect features#
 		#################
+		cur_path=str(os.getcwd())
+		parent_path=os.path.dirname(cur_path)
+		savDir=parent_path+"/SEG_"+basename(cur_path)
+		print(savDir)
 		if name.endswith(".tif"):
 			print(name)
 			img2 = np.array(cv.imread(name,-1))
@@ -61,9 +68,10 @@ class segment_2D:
 			#use detections to set up watershed seeds#
 			##################################
 			
-			
+			mask_output=np.zeros((img2.shape[0]-2,img2.shape[1]-2),np.uint8) #final post contour fill watershed segmented images are 1918x1918 by virtue of the floodfilling method. Unsegmented blanks need to but cut to size too.
 			if len(peak_crd)==0: #If no peaks detected, output blank z slice and move onto next slice
-				cv.imwrite(name[:-4]+"_seg.tif",mask)
+				#os.chdir(output_dir_path)
+				cv.imwrite(savDir+"/"+name[:-4]+"_seg.tif",mask_output)
 				return
 			clusterer = DBSCAN(eps=50,min_samples=5,algorithm='auto').fit(peak_crd) #cluster local peaks together.  eps and min_samples as var-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[] O []
 
@@ -291,7 +299,7 @@ class segment_2D:
 			uniq_wshed = np.unique(wshed_show)
 
 			wshed_mask=np.zeros(img2.shape,np.uint8) #set up blank canvas for corona placement in 2nd stage of environment sensing
-			corona_wshed_delta=1.15 #comparison factor between watershed and its corona -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[] O []
+			corona_wshed_delta=1.2 #comparison factor between watershed and its corona -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------[] O []
 			for a in uniq_wshed: #iterate through each watershed region
 				occur=np.count_nonzero(wshed_show==a)
 				#print("{} frequency = {}".format(a,occur))
@@ -339,26 +347,35 @@ class segment_2D:
 			contour_draw_fill=cv.floodFill(blanc_mask, contour_draw, (0,0),120)
 			contour_draw_fill=np.where(contour_draw_fill[1]==0,255,contour_draw_fill[1])
 			contour_draw_fill=np.where(contour_draw_fill==120,0,contour_draw_fill)
-			#contour_draw_fill=flood_fill(contour_draw,(0,0),255)
-			#flood_fill(contour_draw,(0,0),200)
+
 			#print(contour_draw_fill)
 			#contour_draw_fill = np.multiply(contour_draw_fill,255).astype(np.uint8)
 			
 			#contour_draw=cv.drawContours(eightB_img2,contours,-1,(255,255,255),1) #overlay contours on source
 			#cv.imwrite(name[:-4]+"_seg.tif",blanc_mask) #output
-			#cv.imwrite(name[:-4]+"_seg.tif",contour_draw_fill) #output
-			cv.imwrite(name[:-4]+"_seg.tif",contour_draw_fill) #output
+			#cv.imwrite(name[:-4]+"_seg.tif",contour_draw) #output
+			#os.chdir(output_dir_path)
+			cv.imwrite(savDir+"/"+name[:-4]+"_seg.tif",contour_draw_fill) #output
 
 
 	def __init__(self):
 		curdirA=os.getcwd()
 		for dir in os.listdir(curdirA):
 			print(dir)
+			#output_dir = "SEG_"+dir
+			#os.mkdir(output_dir)
+			#output_dir_path=os.path.abspath(output_dir)
 			if os.path.isdir(dir) is True:
+				output_dir = "SEG_"+dir
+				os.mkdir(output_dir)
+				#output_dir_path=os.path.abspath(output_dir)
 				curdir=os.chdir(dir)
 				self.listdirec=os.listdir(curdir)
 				
-				with Pool(3) as p:
+				with Pool(10) as p:
+					#lock = Lock()
+					#manager = Manager()
+					#output_dir_path=manager.Value(c_char_p, output_dir_path)
 					p.map(self.sliceBySlice,self.listdirec)
 					os.chdir(curdirA)
 
