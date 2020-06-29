@@ -372,7 +372,7 @@ class segment_2D:
 				curdir=os.chdir(dir)
 				self.listdirec=os.listdir(curdir)
 				
-				with Pool(10) as p:
+				with Pool(12) as p:
 					#lock = Lock()
 					#manager = Manager()
 					#output_dir_path=manager.Value(c_char_p, output_dir_path)
